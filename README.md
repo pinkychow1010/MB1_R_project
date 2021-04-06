@@ -26,9 +26,12 @@ In this section a Shiny app is developed to visualize global deforestation hotsp
 
 
 ## Author
-Ka Hei Chow MSc. Student in [Applied Earth Observation and Geoanalysis (EAGLE)](http://eagle-science.org/) [linkedin](https://www.linkedin.com/in/ka-hei-chow-231345188/) E-mail: ka-hei-pinky.chow@stud-mail.uni-wuerzburg.de
+Ka Hei Chow MSc. Student in [Applied Earth Observation and Geoanalysis (EAGLE)](http://eagle-science.org/)
+Linkedin: https://www.linkedin.com/in/ka-hei-chow-231345188/) E-mail: ka-hei-pinky.chow@stud-mail.uni-wuerzburg.de
 
 ## References
-[C Aybar, Q Wu, L Bautista, R Yali and A Barja (2020) rgee: An R package for interacting with Google Earth Engine Journal of Open Source Software.] (https://github.com/r-spatial/rgee/)
+[C Aybar, Q Wu, L Bautista, R Yali and A Barja (2020) rgee: An R package for interacting with Google Earth Engine Journal of Open Source Software.](https://github.com/r-spatial/rgee/)
+
 Forest Area. (2018). Retrieved April 6, 2021, from https://data.worldbank.org/indicator/AG.LND.FRST.ZS
+
 Gorelick, N., Hancher, M., Dixon, M., Ilyushchenko, S., Thau, D., & Moore, R. (2017). Google Earth Engine: Planetary-scale geospatial analysis for everyone.
