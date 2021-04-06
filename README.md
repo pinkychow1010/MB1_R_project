@@ -12,6 +12,8 @@ In this section the downloaded Landsat data is preprocessed, and spectral indexe
 
 ![dndvi](https://github.com/pinkychow1010/MB1_R_project/blob/master/example_output/dndvi.png)
 
+![leaflet](https://github.com/pinkychow1010/MB1_R_project/blob/master/example_output/deforestation.JPG)
+
 ## **2.Sentinel-1**
 
 In this section forest disturbance analysis is performed using Sentinel-1 GRD back-scatter data assessed via rgee package. Threshold is developed to derive forest land cleared between 2018 and 2020.
