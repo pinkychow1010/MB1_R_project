@@ -4,11 +4,12 @@ In this repository you will find the analysis of gold mining temporal dynamics i
 ## **1.Landsat-8**
 
 In this section the downloaded Landsat data is preprocessed, and spectral indexes, NDVI and NDWI are calculated from the data. Statistical analysis, including Tasseled Cap Analysis and Change Vector Analysis are performed to investigate the characteristics of the mining development, which can be identified from both mining pool and cleared land. Deforestation area are finally derived from dNDVI visualized in an interactive map.
+
 ![dndvi](https://github.com/pinkychow1010/MB1_R_project/blob/master/example_output/dndvi.png)
 
 ## **2.Sentinel-1**
 
-In this section forest disturbance analysis is performed using Sentinel-1 GRD back-scatter data assessed via rgee package. Threshold is developed to derived forest land cleared between 2018 and 2020.
+In this section forest disturbance analysis is performed using Sentinel-1 GRD back-scatter data assessed via rgee package. Threshold is developed to derive forest land cleared between 2018 and 2020.
 
 ![S1](https://github.com/pinkychow1010/MB1_R_project/blob/master/example_output/s1_deforestation.JPG)
 
