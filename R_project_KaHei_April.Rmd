@@ -1,0 +1,575 @@
+---
+title: "MB1 Introduction to Programming (WS 2020/21)"
+subtitle: 'Semester Project: Temporal Dynamics of Gold Mining in Munduruku (Pará) Indigenous Reserves'
+author:
+  - Ka Hei Chow
+date: "`r format(Sys.time(), '%d %B %Y')`"
+tags: [EAGLE, R]
+abstract: |
+  Despite the current climate crisis has addressed the destructive deforestation in the Amazon, the world's largest rainforest which hosts immense biodiversity, its deforestation rate had rapidly surged in the past years, argubly due to the Bolsonaro's regime in Brazil. Although indigenous territory is protected from development, illegal mining prevails and exposes indigenous people to cleared land, damaged ecosystem and comtaiminated water.
+
+  This project focuses on Munduruku Indigenous Reserves (-7.173734, -57.272078) located in the Pará state of Brazil. It aims to investigate spatial patterns of the recent mining and deforestation in the region, as well as to show the underlying issues of global forest changes using interactive data visualization. The tasks in this project include:
+  
+  a) Landsat-8 (Path: 228; Row: 065) Preprocessing;
+  
+  b) Calculation of Spectral Indexes and identification of recent deforestation;
+  
+  c) Statistical Analysis of spectral information and Change Vector Analysis;
+  
+  d) Identification of Forest Disturbance from Sentinel-1 using rgee;
+  
+  e) Shiny App for interactively mapping Global Forest Changes
+  
+geometry: margin=1in
+fontfamily: mathpazo
+fontsize: 16pt
+spacing: single
+output: html_notebook
+fig_caption: yes
+---
+
+----------------------------------------------------------
+This is the MB1 semester [R Project](https://github.com/pinkychow1010/MB1_Programming). 
+
+Fig. Map showing the mining operation with in the indigenous reserve, which is the study site of this R project. 
+![](C:/Users/Admin/Desktop/Programming/map.jpg)
+
+**Loading libraries**
+
+Installing and loading R libraries for the following processing and visualization.
+```{r echo = T, results = 'hide', error=FALSE, warnings=FALSE}
+if(!require(devtools)) install.packages("devtools", repos = "http://cran.us.r-project.org")
+if(!require(patchwork)) install.packages("patchwork", repos = "http://cran.us.r-project.org")
+if(!require(sp)) install.packages("sp", repos = "http://cran.us.r-project.org")
+if(!require(sf)) install.packages("sf", repos = "http://cran.us.r-project.org")
+if(!require(rgdal)) install.packages("rgdal", repos = "http://cran.us.r-project.org")
+if(!require(ggplot2)) install.packages("ggplot2", repos = "http://cran.us.r-project.org")
+if(!require(reshape2)) install.packages("reshape2", repos = "http://cran.us.r-project.org")
+if(!require(data.table)) install.packages("data.table", repos = "http://cran.us.r-project.org")
+if(!require(ggthemes)) install.packages("ggthemes", repos = "http://cran.us.r-project.org")
+if(!require(ggdark)) install.packages("ggdark", repos = "http://cran.us.r-project.org")
+if(!require(ggnewscale)) install.packages("ggnewscale", repos = "http://cran.us.r-project.org")
+if(!require(tidyverse)) install.packages("tidyverse", repos = "http://cran.us.r-project.org")
+if(!require(rasterVis)) install.packages("rasterVis", repos = "http://cran.us.r-project.org")
+if(!require(mapview)) install.packages("mapview", repos = "http://cran.us.r-project.org")
+if(!require(RStoolbox)) install.packages("RStoolbox", repos = "http://cran.us.r-project.org")
+if(!require(glcm)) install.packages("glcm", repos = "http://cran.us.r-project.org")
+if(!require(rgee)) install.packages("rgee", repos = "http://cran.us.r-project.org")
+if(!require(leaflet)) install.packages("leaflet", repos = "http://cran.us.r-project.org")
+if(!require(dplyr)) install.packages("dplyr", repos = "http://cran.us.r-project.org")
+```
+
+User-defined parameter
+```{r echo = T, results = 'hide'}
+pic_save = FALSE #TRUE #please change the parameter to TRUE if outputs wished to be downloaded
+```
+
+## **Task 1: Landsat 8 scene pre-processing**
+
+Landsat 8 scenes at the region of interest have been downloaded from USGS. Here we set up the directory and check the existence of the tiff files.
+```{r error=FALSE, warnings=FALSE}
+#Acquire landsat scenes
+outdir="C:/Users/Admin/Desktop/Programming/R_project"
+setwd(outdir)
+
+L8_2018 <- paste0(outdir,"/download/landsatdata/LC08_2018")
+L8_2019 <- paste0(outdir,"/download/landsatdata/LC08_2019")
+L8_2020 <- paste0(outdir,"/download/landsatdata/LC08_2020")
+
+#check if files are missing
+file.exists(L8_2018)
+file.exists(L8_2019)
+file.exists(L8_2020)
+```
+Making separate lists for every year 2018 - 2020
+```{r error=FALSE, warnings=FALSE}
+#save the file lists
+productfiles2018 <- list.files(L8_2018, full.names = TRUE)
+productfiles2019 <- list.files(L8_2019, full.names = TRUE)
+productfiles2020 <- list.files(L8_2020, full.names = TRUE)
+```
+
+Preprocessing the tiff files into raster stacks for every year including only band 1 to band 7
+```{r error=FALSE, warnings=FALSE}
+#write a function for extract all 7 bands from landsat-8 scenes
+grepBands <- function(files) {
+  bands <- c(grep('_band[1-7]{1}.tif', files, value=TRUE),
+           grep('_B[1-7]{1}.TIF', files, value=TRUE)
+           )
+  return(bands) #return the names of the files
+}
+
+#extract the bands
+bands2018 <- grepBands(productfiles2018) #apply function to each year
+bands2019 <- grepBands(productfiles2019)
+bands2020 <- grepBands(productfiles2020)
+  
+#check if the greps were successful:
+#this code give the status of the bands extraction - expected: Good to go message.
+if (exists("bands2018") == FALSE || 
+    exists("bands2019") == FALSE || 
+    exists("bands2020") == FALSE){
+warning("Bands objects not found!")
+} else if ((length(bands2018) == 7 & length(bands2019) == 7 & length(bands2020) == 7)) {
+print("The bands are all there! Good to go!")
+} else {
+    print("There are bands missing!")
+}
+
+#put the bands in the lists into raster stack objects
+stack2018 <- stack(bands2018)
+stack2019 <- stack(bands2019)
+stack2020 <- stack(bands2020)
+```
+
+## **Task 2: Calculate NDVI and NDWI**
+
+Explore the raster stacks including checking the layers, coordinate systems and resolution
+```{r error=FALSE, warnings=FALSE}
+#number of layers
+nlayers(stack2018)
+#nlayers(stack2019)
+#nlayers(stack2020)
+
+#coordinate systems
+crs(stack2018)
+#crs(stack2019)
+#crs(stack2020)
+
+#resolution
+res(stack2018)
+#res(stack2019)
+#res(stack2020)
+```
+
+Visualization of the RGB true composite image for every year
+```{r error=FALSE, warnings=FALSE}
+#print out the true color composites with the plotRGB function
+#2018
+par(col.axis="white",col.lab="white",tck=0)
+plotRGB(stack2018, r = 4, g = 3, b = 2, axes = TRUE, 
+        stretch = "lin", main = "True Color Composite 2018") #plot rgb image
+box(col="white") #layout
+
+#2019
+par(col.axis="white",col.lab="white",tck=0)
+plotRGB(stack2019, r = 4, g = 3, b = 2, axes = TRUE, 
+        stretch = "lin", main = "True Color Composite 2019")
+box(col="white")
+
+#2020
+par(col.axis="white",col.lab="white",tck=0)
+plotRGB(stack2020, r = 4, g = 3, b = 2, axes = TRUE, 
+        stretch = "lin", main = "True Color Composite 2020")
+box(col="white")
+```
+
+Write the function for calculating NDVI and NDWI for the identification of the deforested areas from the Landsat-8 scenes
+```{r error=FALSE, warnings=FALSE}
+#write function for calculating NDVI
+ndvi <- function(image) {
+  NDVI <- (image[[5]] - image[[4]])/(image[[5]] + image[[4]]) #normalized function using red and near-infrared (NIR)
+  return(NDVI) #return result
+}
+
+#write function for calculating NDWI
+ndwi <- function(image) {
+  NDWI <- (image[[3]] - image[[5]])/(image[[3]] + image[[5]]) #normalized function using green and near-infrared (NIR)
+  return(NDWI) #return result
+}
+```
+
+**Crop Extent**
+
+Crop the full Landsat-8 scenes into the deforested regions
+```{r echo = T, results = 'hide', error=FALSE, warnings=FALSE}
+#set up the region of interest
+roi <- as(extent(-57.451389,-57.1525,-7.275556,-6.966111), 'SpatialPolygons')
+
+#define the coordinate system of the coordinates: lat and lon
+crs(roi)="+proj=longlat +datum=WGS84"
+
+#transform coordinates of our defined region to UTM
+roi.UTM <- spTransform(roi, crs(stack2018))
+roi.UTM
+
+#crop the stack image into the extent of roi
+img2018_roi <- crop(stack2018, roi.UTM)
+img2019_roi <- crop(stack2019, roi.UTM)
+img2020_roi <- crop(stack2020, roi.UTM) #the preprocessed products for the analysis
+```
+
+Create folder for output
+```{r}
+if (pic_save == TRUE) { #if the parameter is true, set a folder for output
+  subDir <- "figureOutput" #name of the folder
+  ifelse(!dir.exists(file.path(outdir, subDir)), dir.create(file.path(outdir, subDir)), FALSE) #only create folder if the folder does not exists
+}
+```
+
+Remove unneeded variables
+```{r}
+rm(L8_2018,L8_2019,L8_2020,outdir,productfiles2018,productfiles2019,productfiles2020)
+
+rm(roi,roi.UTM,stack2018,stack2019,stack2020,bands2018,bands2019,bands2020)
+```
+
+**Calculate Spectral Indexes**
+
+Apply NDVI and NDWI functions to the raster stacks
+```{r error=FALSE, warnings=FALSE}
+#calculate NDVI
+ndvi2018 <- ndvi(img2018_roi) #apply ndvi function to each year
+ndvi2019 <- ndvi(img2019_roi)
+ndvi2020 <- ndvi(img2020_roi)
+
+#calculate differences of NDVI between years
+dndvi_18_19 <- overlay(ndvi2019,
+                      ndvi2018,
+                      fun=function(r1, r2){return(r2-r1)}) #define function for overlay
+
+dndvi_19_20 <- overlay(ndvi2020,
+                      ndvi2019,
+                      fun=function(r1, r2){return(r2-r1)})
+
+#calculate NDWI
+ndwi2018 <- ndwi(img2018_roi) #apply ndwi function to each year
+ndwi2019 <- ndwi(img2019_roi)
+ndwi2020 <- ndwi(img2020_roi)
+```
+
+ - **Plot NDWI for 2020**
+ 
+Transform the raster into dataframe for plotting NDWI using ggplot.
+```{r error=FALSE, warnings=FALSE}
+memory.limit(size=50000) #increased the allowed memory for the plotting
+
+#write a NDWI plotting function for all years
+ndwi_plot <- function(lyr){
+  as(lyr,"SpatialPixelsDataFrame") %>% #pipe data frame into ggplot
+  as.data.frame() %>%
+  ggplot(data = .) +
+  geom_tile(aes(x = x, y = y, fill = layer)) + #raster map
+  theme(axis.text = element_blank(), #define custom layout
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank()) +
+  labs(title = paste("NDWI ", substr(deparse(substitute(lyr)), nchar( deparse(substitute(lyr)))-4+1,nchar(deparse(substitute(lyr))))),  #labels are extracted from the names of the variables
+       x = " ", 
+       y = " ") + 
+  scale_fill_gradient2(high = "#0020FF", #custom coloring
+                      mid = "#00FFBD",
+                      low = "#533300",
+                      midpoint = -0.2,
+                      name = "NDWI")
+}
+
+p_ndwi18 <- ndwi_plot(ndwi2018) #apply the plot function to each year
+p_ndwi19 <- ndwi_plot(ndwi2019)
+p_ndwi20 <- ndwi_plot(ndwi2020)
+
+p_ndwi <- p_ndwi18 + p_ndwi19 + p_ndwi20 +  plot_layout(ncol = 2)#using all plots as subplots with the patchwork package with defined layout
+p_ndwi
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "NDWI.png", scale=1.5, dpi=300)
+}
+```
+From the NDWI, we can see the deforested area has a value around -0.2, sparsely vegetated area has values around -0.4 while the complete forest has lower values around -0.8. Although the mining area had already been established in the earlier image, some changes can be seen in the more recent image.
+
+ - **Plot NDVI**
+ 
+Same for plotting NDVI.
+```{r error=FALSE, warnings=FALSE}
+memory.limit(size=50000)
+
+#define another function with different layout for plotting ndvi
+ndvi_plot <- function(lyr){
+  as(lyr,"SpatialPixelsDataFrame") %>% #pipe data frame into ggplot
+  as.data.frame() %>%
+  ggplot(data = .) +
+  geom_tile(aes(x = x, y = y, fill = layer)) +
+  theme(axis.text = element_blank(), #define custom layout
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank()) +
+  labs(title = paste("NDVI ", substr(deparse(substitute(lyr)), nchar( deparse(substitute(lyr)))-4+1,nchar(deparse(substitute(lyr))))),  #labels
+       x = " ", 
+       y = " ") + 
+  scale_fill_gradient2(high = "#087F28", #color scheme for plotting
+                      mid = "#CEE50E",
+                      low = "#FF0000",
+                      midpoint = 0.2,
+                      name = "NDVI")
+}
+
+p_ndvi18 <- ndvi_plot(ndvi2018) #apply defined function
+p_ndvi19 <- ndvi_plot(ndvi2019)
+p_ndvi20 <- ndvi_plot(ndvi2020)
+
+p_ndvi <- p_ndvi18 + p_ndvi19 + p_ndvi20 + plot_layout(ncol = 2)#combine all plots
+p_ndvi
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "NDVI.png", scale=1.5, dpi=300)
+}
+```
+Just like NDWI, NDVI also shows similar patterns of deforested/mining area, which have significantly lower NDVI (~0.25) than the forest (>0.8). Next steps we will focus on the changes. 
+
+**NDVI differences**
+
+Plot the changes of NDVI using ggplot to better visualize the temporal differences. 
+```{r error=FALSE, warnings=FALSE}
+#Differences in NDVI between 2018 and 2020
+p_dNDVI <- ggplot() + 
+  geom_tile(data = as.data.frame(as(dndvi_18_19, "SpatialPixelsDataFrame")), 
+            aes(x = x, y = y, fill = layer)) + #raster map for 18-19
+    scale_fill_gradient2(high = "#FBFF00", #coloring for 18-19
+                      mid = NA,
+                      low = NA,
+                      midpoint = 0,
+                      limits = c(-0.2,0.2),
+                      name = "18_19") + 
+    new_scale_color() + #from ggnewscale package for multiple color scale
+    geom_tile(data = as.data.frame(as(dndvi_19_20, "SpatialPixelsDataFrame")), aes(x = x, y = y, fill = layer)) + #raster map for 19-20
+    scale_fill_gradient2(high = "#FF0000", #new color scale for 19-20
+                      mid = NA,
+                      low = NA,
+                      midpoint = 0,
+                      limits = c(-0.2,0.2),
+                      name = "19_20") + 
+  theme(axis.text = element_blank(), #layout
+        axis.ticks = element_blank(),
+        panel.background = element_blank(),
+        panel.grid.minor = element_blank(),
+        plot.title = element_text(hjust = 0.5)) +
+  labs(title = "NDVI Differences", #plot title
+       x = " ", 
+       y = " ") + 
+  dark_mode(theme_fivethirtyeight()) #ggtheme
+
+p_dNDVI
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "dNDVI.png", scale=1.5, dpi=300)
+}
+```
+From the dNDVI image, we can see the development of deforestation between 2018 and 2020: Red stripes represent deforestation between 2018 and 2019, and yellow stripes represent deforestation between 2019 and 2020. They seem largely overlapped without zooming in. Apparently, changes are mostly going on at the edges of the already deforested area. To look better into the details, we can add a interactive base map in the background using the leaflet package.
+
+```{r}
+#leaflet map
+leaflet() %>% addProviderTiles(providers$Esri.WorldImagery) %>% #base map
+  setView(-57.272078, -7.173734, zoom = 14) %>% #set centre
+  addRasterImage(dndvi_18_19, colors = "YlGnBu", opacity = 0.75, group = "Year18_19") %>% #first map
+  addRasterImage(dndvi_19_20, colors = "YlOrRd", opacity = 0.75, group = "Year19_20") %>% #second map
+  addLayersControl( #layer control to allow user switch individual maps on and off
+    baseGroups = c("Esri"),
+    overlayGroups = c("Year18_19", "Year19_20"), #groups of selection
+    options = layersControlOptions(collapsed = FALSE))
+
+```
+
+## **Task 3: Analyze Mining Development (2018 - 2020)**
+
+ From the leaflet map we can clearly see the high correlation between recently deforested area and the already cleared area. The stripes appear to be extended in different branches compared to the earlier image. 
+ 
+ - **Change Vector Analysis (CVA)**
+ 
+Change detection using both magnitude and direction and plot the results. There are different changes comparing two images, however, part of the "changes" do not refers to deforestation, but caused by the cloud cover. To better distinguish the differences between recent deforestation and cloud cover, we can use CVA to observe are there differences between their angle of changes. Assuming the relationship between NDVI and NDWI is distinctive for cloud cover and deforestation, we input the stacked image of NDVI and NDWI for 2019 and 2020.
+```{r error=FALSE, warnings=FALSE}
+#CVA (red and NIR bands of landsat-8) between 2018 and 2020
+cva_18_20 <- rasterCVA(stack(img2018_roi[[5]],img2018_roi[[4]]),stack(img2020_roi[[5]],img2020_roi[[4]]))
+
+#Plot results
+plot(cva_18_20)
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "changeVectorAnalysis.png", scale=1.5, dpi=300)
+}
+```
+From the CVA results, we can see the deforested area has a specific changing angles around 300-360 degrees, shown in green color in the left image. Meanwhile, we can see quite some noise in the forest with relatively small changing angles, which is arguably not representing deforestation/ glod mining.
+
+```{r}
+#view deforested CVA in leaflet
+leaflet() %>% addProviderTiles(providers$Esri.WorldImagery) %>% 
+  setView(-57.272078, -7.173734, zoom = 14) %>% 
+  addRasterImage(cva_18_20[[1]], colors = "YlOrRd", opacity = 0.55) #add raster results to an interactive map
+```
+ 
+  - **GLCM Analysis**
+  To better understand the characteristics of deforested area, we can also do GLCM analysis to investigate the spatial patterns using glcm package.
+```{r error=FALSE, warnings=FALSE}
+#2020
+glcm <- glcm(ndvi2020, window = c(9,9), shift = c(1,1), 
+              statistics = c("mean", "variance", "homogeneity", "contrast", 
+                             "dissimilarity")) #selection of statistical parameters
+plot(glcm) #show results
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "GLCM.png", scale=1.5, dpi=300)
+}
+```
+From the GLCM analysis we can see the deforested area can be distinguish from different elements such as variance, homogeneity and dissimilarity. For example, the dissimilarity reveals the large difference of texture within the group. We can also calculate tasseled cap to check out the spatial patterns.
+ 
+ - **Tasseled Cap Calculation**
+```{r error=FALSE, warnings=FALSE}
+#2018 scene
+tc_2018 <- tasseledCap(img2018_roi[[c(2:7)]], sat = "Landsat8OLI") #adjust parameters to be landsat-8 specific
+plot(tc_2018)
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "tc_2018.png", scale=1.5, dpi=300)
+}
+
+#2019 scene
+tc_2019 <- tasseledCap(img2019_roi[[c(2:7)]], sat = "Landsat8OLI")
+plot(tc_2019)
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "tc_2019.png", scale=1.5, dpi=300)
+}
+
+#2020 scene
+tc_2020 <- tasseledCap(img2020_roi[[c(2:7)]], sat = "Landsat8OLI")
+plot(tc_2020)
+
+if (pic_save == TRUE) { #save the output
+ggsave(path = paste0(outdir,"/figureOutput"), "tc_2020.png", scale=1.5, dpi=300)
+}
+```
+In the Tasseled Cap analysis, the most useful element for deforestation seems to be greenness which reveals clear patterns of the mining and deforestation development. Despite the mining pools in the gold mine, the wetness of the deforested area seems to be lower.
+
+## **Task 4: Classify Forest Disturbance using Sentinel-1 and rgee Package**
+We can also investigate the deforestation process using Sentinel-1 images. As downloading and preprocessing radar images are computationally expensive, Google Earth Engine (GEE) offers R user another user-friendly option to work with Sentinel-1 images. In this project, backscatter values from Sentinel-1 level level-1 GRD images are analyzed for the region of interest.
+
+**Install, initialize and open Google Earth Engine (GEE)**
+
+Set up.
+```{r echo = T, results = 'hide', error=FALSE, warnings=FALSE}
+#ee_install()
+ee_Initialize()
+ee_check() 
+ee_clean_credentials() 
+ee_clean_pyenv() 
+
+ee_search_dataset() %>% #search for data
+  ee_search_title("Sentinel-1 SAR GRD") %>% #look for sentinel-1
+  ee_search_display()   #display search results
+
+```
+
+**Define ROI**
+
+Define coordinates of the polygon for query.
+```{r error=FALSE, warnings=FALSE}
+roi_ee <- ee$Geometry$Polygon(
+  list(
+    c(-57.45139, -7.275556),
+    c(-57.45139, -6.966111),
+    c(-57.1525, -6.966111),
+    c(-57.1525, -7.275556))
+)
+```
+
+**Collect images**
+
+Acquire VV polarized Sentinel-1 images for the date ranges.
+```{r error=FALSE, warnings=FALSE}
+imgVV <- ee$ImageCollection('COPERNICUS/S1_GRD')$ #collect S1 data
+        filter(ee$Filter$listContains('transmitterReceiverPolarisation','VV'))$
+        filter(ee$Filter$eq('instrumentMode', 'IW'))$
+        filter(ee$Filter$eq('orbitProperties_pass', 'DESCENDING'))$
+        select('VV')
+
+#2018
+S1_2018 <- imgVV$
+  filterDate('2018-01-01' ,'2018-12-31')$ #filter dates
+  filterBounds(roi_ee)$ #set boundary
+  mean()$ #get mean values
+  clip(roi_ee) #clip the images
+
+#2019
+S1_2019 <- imgVV$
+  filterDate('2019-01-01' ,'2019-12-31')$
+  filterBounds(roi_ee)$
+  mean()$
+  clip(roi_ee)
+
+#2020
+S1_2020 <- imgVV$
+  filterDate('2020-01-01' ,'2020-12-31')$
+  filterBounds(roi_ee)$
+  mean()$
+  clip(roi_ee)
+```
+
+**Speckle Filtering**
+
+Preprocess acquired Sentinel-1 images to reduce salt-and-pepper noise.
+```{r error=FALSE, warnings=FALSE}
+kernel <- ee$Kernel$circle((radius = 3)) #define kernel
+
+filtered_2018 <-  S1_2018$focal_mean(kernel = kernel, iterations = 1) #using mean filter for smoothing
+filtered_2019 <-  S1_2019$focal_mean(kernel = kernel, iterations = 1)
+filtered_2020 <-  S1_2020$focal_mean(kernel = kernel, iterations = 1)
+
+Map$addLayer(filtered_2020, list(min = c(-30), max = c(30)), "filtered_2020") #display the filtered results in map
+Map$centerObject(roi_ee, 12) #set center of display
+```
+
+**Detection Forest Disturbance**
+
+Apply threshold for the identification of disturbed forest area and mask out the area.
+```{r error=FALSE, warnings=FALSE}
+threshold <- -9 #define threshold for detect disturbed forest based on pixel value inquiry
+
+#filter data below threshold
+area_2018 <- filtered_2018$lt(threshold)$rename("disturbed_area") #filter image to include only pixels below threshold; rename it to disturbed area
+area_2019 <- filtered_2019$lt(threshold)$rename("disturbed_area")
+area_2020 <- filtered_2020$lt(threshold)$rename("disturbed_area")
+
+Map$addLayer(area_2018, {}, "forestDisturbance_2018") #display map
+Map$addLayer(area_2019, {}, "forestDisturbance_2019")
+Map$addLayer(area_2020, {}, "forestDisturbance_2020")
+```
+We can compared the data with Esri.WorldImagery basemap. Although the deforested area is not as visible as in the optical images, deforested areas show generally lower back scatter values. Besides, the radar data also reveals information about structure of the forest: low back scatter value prevail in changed forest structure compared to the base map. Nevertheless, more investigation need to be done for the details of changes it represents.
+
+**Development of Deforestation**
+
+Differentiate the disturbed forest area for the subsequent years.
+```{r error=FALSE, warnings=FALSE}
+#define area disturbed between 2018 and 2019
+disturbed_18_19 <- (filtered_2018$gte(threshold))$ #get the pixels only dropped below threshold between 2018 and 2019
+  And(filtered_2019$lt(threshold))$
+  rename("disturbed_area_18_19")
+
+#define area disturbed between 2019 and 2020
+disturbed_19_20 <- filtered_2019$gte(threshold)$ #get the pixels only dropped below threshold between 2019 and 2020
+  And(filtered_2020$lt(threshold))$
+  rename("disturbed_area_19_20")
+
+Map$addLayer(disturbed_18_19, {}, 'Disturbance between 2018 and 2019') #display map to visualize temporal changes
+Map$addLayer(disturbed_19_20, {}, 'Disturbance between 2019 and 2020')
+
+```
+If we differentiate not only the low backscatter values, but also the changes of low back scatter values, we can get insights about the mining development and get rid of other unneeded signals.
+
+## **Task 5: Create Shiny App for visualizing World Bank forest data**
+
+* Please refer to app.R for the script of the Shiny App.
+
+This app can be opened by clicking this link:
+https://eagle-rproject-globalforestchanges.shinyapps.io/globalForestChanges/
+
+
+## **Reference:**
+
+https://data.worldbank.org/indicator/AG.LND.FRST.ZS
+
+https://news.mongabay.com/2020/12/illegal-mining-sparks-malaria-outbreak-in-indigenous-territories-in-brazil/
+  
+https://maaproject.org/2020/gold_brazil/
+  
+https://amazonwatch.org/assets/files/2020-complicity-in-destruction-3.pdf
+  
+https://news.mongabay.com/2020/01/vale-has-filed-hundreds-of-requests-to-exploit-indigenous-lands-in-amazon/

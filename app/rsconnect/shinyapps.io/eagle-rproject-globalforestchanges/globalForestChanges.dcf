@@ -1,0 +1,12 @@
+name: globalForestChanges
+title:
+username:
+account: eagle-rproject-globalforestchanges
+server: shinyapps.io
+hostUrl: https://api.shinyapps.io/v1
+appId: 3785114
+bundleId: 4339573
+url: https://eagle-rproject-globalforestchanges.shinyapps.io/globalForestChanges/
+when: 1615641146.84595
+asMultiple: FALSE
+asStatic: FALSE
