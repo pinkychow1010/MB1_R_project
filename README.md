@@ -1,5 +1,5 @@
 # MB2-Final-Project
-This Script is written as a semester project for the Programming and Geostatistical Analysis course [MB2](http://eagle-science.org/project/programming-and-geostatistical-analysis/) within the MSc. degree [MSc. in Applied Earth Observation and Geoanalysis (EAGLE)](http://eagle-science.org/) at [JMU Würzburg](https://www.uni-wuerzburg.de/en/home/).
+This Script is written as a semester project for the Programming and Geostatistical Analysis course [MB2](http://eagle-science.org/project/programming-and-geostatistical-analysis/) within [MSc. in Applied Earth Observation and Geoanalysis (EAGLE)](http://eagle-science.org/) at [JMU Würzburg](https://www.uni-wuerzburg.de/en/home/).
 
 The aim of this project is to generate interactive visuals of illegal gold mining in Munduruku using different types of earth observation data.
 
